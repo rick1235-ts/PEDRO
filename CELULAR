@@ -25,10 +25,14 @@
 
     <div id="playerContainer" class="relative mb-10 hidden">
       <video id="player" controls muted class="w-full max-w-4xl mx-auto block rounded-lg shadow-2xl"></video>
+      <div class="mt-2 flex justify-center gap-4">
+        <button id="prevEpisodeBtn" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded">Anterior</button>
+        <button id="nextEpisodeBtn" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded">Próximo</button>
+      </div>
       <button id="closePlayer" class="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-full">✖</button>
     </div>
 
-    <h2 class="text-2xl mb-4">Conteúdo Disponível</h2>
+    <h2 class="text-2xl mb-4">Filmes Disponíveis</h2>
     <div id="content" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
     <div id="loadMoreContainer" class="mt-6 flex justify-center"></div>
   </div>
@@ -49,14 +53,16 @@
   <script>
     const fileInput = document.getElementById('fileInput');
     const searchInput = document.getElementById('searchInput');
+    const categorySelect = document.getElementById('categorySelect');
     const contentDiv = document.getElementById('content');
+    const loadMoreContainer = document.getElementById('loadMoreContainer');
+    const baixarBtn = document.getElementById('baixarListaBtn');
+    const loadSpinner = document.getElementById('loadSpinner');
     const playerContainer = document.getElementById('playerContainer');
     const player = document.getElementById('player');
     const closePlayer = document.getElementById('closePlayer');
-    const loadMoreContainer = document.getElementById('loadMoreContainer');
-    const categorySelect = document.getElementById('categorySelect');
-    const baixarBtn = document.getElementById('baixarListaBtn');
-    const loadSpinner = document.getElementById('loadSpinner');
+    const prevEpisodeBtn = document.getElementById('prevEpisodeBtn');
+    const nextEpisodeBtn = document.getElementById('nextEpisodeBtn');
     const episodesModal = document.getElementById('episodesModal');
     const closeModal = document.getElementById('closeModal');
     const modalTitle = document.getElementById('modalTitle');
@@ -68,134 +74,182 @@
     const itemsPerPage = 60;
     let hlsInstance = null;
 
-    // Parse M3U
-    const parseM3U = text => text.split('\n').reduce((acc, line, i, arr) => {
-      if (line.startsWith('#EXTINF')) {
-        const titleMatch = line.match(/,(.*)/);
-        const logoMatch = line.match(/tvg-logo="(.*?)"/);
-        const groupMatch = line.match(/group-title="(.*?)"/);
-        const title = titleMatch ? titleMatch[1].trim() : 'Sem título';
-        const thumb = logoMatch ? logoMatch[1].trim() : null;
-        const group = groupMatch ? groupMatch[1].trim() : '';
-        const url = (arr[i+1] || '').trim();
-        if (title && url.startsWith('http')) acc.push({ title, url, thumb, group });
+    let currentSeriesName = null;
+    let currentSeriesEps = [];
+    let currentEpIndex = null;
+
+    // Parse M3U e exclui 'Ao Vivo'
+    function parseM3U(text) {
+      const lines = text.split(/\r?\n/);
+      const items = [];
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith('#EXTINF')) {
+          const title = (lines[i].match(/,(.*)/) || [])[1]?.trim();
+          const thumb = (lines[i].match(/tvg-logo="(.*?)"/) || [])[1] || 'https://dummyimage.com/300x169/444/fff.png&text=Sem+Imagem';
+          const group = (lines[i].match(/group-title="(.*?)"/) || [])[1] || '';
+          const url = lines[i+1]?.trim();
+          if (url && url.startsWith('http') && group.toLowerCase() !== 'ao vivo') {
+            items.push({ title, url, thumb, group });
+          }
+        }
       }
-      return acc;
-    }, []);
+      return items;
+    }
 
     // Agrupa séries e filmes
-    const groupBySeries = items => items.reduce((acc, item) => {
-      const m = item.title.match(/^(.*) S\d+E\d+/);
-      if (m) {
-        const name = m[1].trim();
-        acc.series[name] = acc.series[name] || [];
-        acc.series[name].push(item);
-      } else acc.movies.push(item);
-      return acc;
-    }, { series: {}, movies: [] });
-
-    // Renderiza itens principais
-    const renderPage = () => {
-      contentDiv.innerHTML = '';
-      const { series, movies } = groupBySeries(filteredItems);
-      // Séries
-      Object.entries(series).forEach(([name, eps]) => {
-        const card = document.createElement('div');
-        card.className = 'bg-gray-800 p-2 rounded-xl cursor-pointer hover:scale-105 transition duration-300 overflow-hidden';
-        card.innerHTML = `<h3 class="font-bold text-center">${name}</h3><p class="text-sm text-center">${eps.length} eps</p>`;
-        card.onclick = () => showSeries(name, eps);
-        contentDiv.appendChild(card);
+    function groupItems(items) {
+      const series = {};
+      const movies = [];
+      items.forEach(item => {
+        const match = item.title.match(/^(.*) S(\d+)E(\d+)/);
+        if (match) {
+          const name = match[1].trim();
+          series[name] = series[name] || [];
+          series[name].push(item);
+        } else {
+          movies.push(item);
+        }
       });
-      // Filmes (paginados)
-      const start = (currentPage-1)*itemsPerPage;
-      movies.slice(start, start+itemsPerPage).forEach(item => renderItem(item));
-      // Load more
-      setupLoadMore(movies.length);
-    };
+      return { series, movies };
+    }
 
-    const renderItem = item => {
-      const card = document.createElement('div');
-      card.className = 'bg-gray-800 p-2 rounded-xl cursor-pointer hover:scale-105 transition duration-300 overflow-hidden';
-      card.innerHTML = `
-        <img src="${item.thumb||'https://dummyimage.com/300x169/444/fff.png&text=Sem+Imagem'}" alt="${item.title}" class="aspect-video object-cover rounded-lg mb-2 w-full" onerror="this.src='https://dummyimage.com/300x169/444/fff.png&text=Sem+Imagem'"/>
-        <h3 class="text-sm truncate">${item.title}</h3>`;
-      card.onclick = () => { openVideoLink(item); window.scrollTo({top:0,behavior:'smooth'}); };
-      contentDiv.appendChild(card);
-    };
+    // Renderiza filmes paginados e séries como blocos
+    function renderPage() {
+      contentDiv.innerHTML = '';
+      const { series, movies } = groupItems(filteredItems);
+      const start = (currentPage - 1) * itemsPerPage;
+      movies.slice(start, start + itemsPerPage).forEach(renderCard);
 
-    // Load more
-    const setupLoadMore = total => {
       loadMoreContainer.innerHTML = '';
-      if (total > currentPage*itemsPerPage) {
+      if (movies.length > currentPage * itemsPerPage) {
         const btn = document.createElement('button');
         btn.textContent = 'Carregar Mais';
         btn.className = 'px-6 py-2 bg-gray-700 rounded hover:bg-gray-600 transition';
         btn.onclick = () => { currentPage++; renderPage(); };
         loadMoreContainer.appendChild(btn);
       }
-    };
 
-    // Mostrar série
-    const showSeries = (name, episodes) => {
+      // Série como um único card
+      Object.entries(series).forEach(([name, eps]) => {
+        const card = document.createElement('div');
+        card.className = 'bg-gray-800 p-2 rounded-xl cursor-pointer hover:scale-105 transition duration-300 overflow-hidden';
+        card.innerHTML = `
+          <img src="${eps[0].thumb}" alt="${name}" class="aspect-video object-cover rounded-lg mb-2 w-full" onerror="this.src='https://dummyimage.com/300x169/444/fff.png&text=Sem+Imagem'"/>
+          <h3 class="font-bold text-center">${name}</h3>
+          <p class="text-sm text-center">${eps.length} episódios</p>`;
+        card.onclick = () => openSeries(name, eps);
+        contentDiv.appendChild(card);
+      });
+    }
+
+    function renderCard(item) {
+      const card = document.createElement('div');
+      card.className = 'bg-gray-800 p-2 rounded-xl cursor-pointer hover:scale-105 transition duration-300 overflow-hidden';
+      card.innerHTML = `
+        <img src="${item.thumb}" alt="${item.title}" class="aspect-video object-cover rounded-lg mb-2 w-full" onerror="this.src='https://dummyimage.com/300x169/444/fff.png&text=Sem+Imagem'"/>
+        <h3 class="text-sm truncate">${item.title}</h3>`;
+      card.onclick = () => { openVideoLink(item); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+      contentDiv.appendChild(card);
+    }
+
+    // Modal de série
+    function openSeries(name, eps) {
+      currentSeriesName = name;
+      currentSeriesEps = eps;
       modalTitle.textContent = name;
       episodesList.innerHTML = '';
-      episodes.forEach(ep => {
+      const last = localStorage.getItem(`last_${name}`);
+      eps.forEach((ep, idx) => {
         const btn = document.createElement('button');
-        btn.className = 'w-full text-left p-2 bg-gray-700 rounded hover:bg-gray-600';
-        btn.textContent = ep.title;
-        btn.onclick = () => { toggleModal(false); openVideoLink(ep); };
+        btn.className = 'w-full text-left p-2 bg-gray-700 rounded hover:bg-gray-600 flex justify-between';
+        btn.innerHTML = `<span>${ep.title}</span>${ep.title===last?'<span>🔴</span>':''}`;
+        btn.onclick = () => playEpisode(idx);
         episodesList.appendChild(btn);
       });
-      toggleModal(true);
-    };
-    const toggleModal = show => show ? episodesModal.classList.remove('hidden') : episodesModal.classList.add('hidden');
-    closeModal.onclick = () => toggleModal(false);
+      episodesModal.classList.remove('hidden');
+    }
+    closeModal.onclick = () => episodesModal.classList.add('hidden');
 
-    // Player
-    const openVideoLink = item => {
-      if (hlsInstance) { hlsInstance.destroy(); hlsInstance=null; }
+    function playEpisode(idx) {
+      currentEpIndex = idx;
+      const ep = currentSeriesEps[idx];
+      localStorage.setItem(`last_${currentSeriesName}`, ep.title);
+      openVideoLink(ep);
+      episodesModal.classList.add('hidden');
+    }
+
+    nextEpisodeBtn.onclick = () => {
+      if (currentSeriesEps && currentEpIndex < currentSeriesEps.length - 1) {
+        playEpisode(currentEpIndex + 1);
+      }
+    };
+    prevEpisodeBtn.onclick = () => {
+      if (currentSeriesEps && currentEpIndex > 0) {
+        playEpisode(currentEpIndex - 1);
+      }
+    };
+
+    function openVideoLink(item) {
+      if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
       if (/\.m3u8$/i.test(item.url) && Hls.isSupported()) {
         hlsInstance = new Hls(); hlsInstance.loadSource(item.url); hlsInstance.attachMedia(player);
-        hlsInstance.on(Hls.Events.MANIFEST_PARSED, ()=>player.play().catch(_=>{}));
-      } else { player.src=item.url; player.play().catch(_=>{}); }
+        hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => player.play().catch(() => {}));
+      } else {
+        player.src = item.url;
+        player.play().catch(() => {});
+      }
       playerContainer.classList.remove('hidden');
+    }
+    closePlayer.onclick = () => {
+      if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+      player.pause();
+      player.src = '';
+      playerContainer.classList.add('hidden');
     };
-    closePlayer.onclick = () => { if(hlsInstance){hlsInstance.destroy();hlsInstance=null;} player.pause();player.src='';playerContainer.classList.add('hidden'); };
 
-    // Filtro
-    const filterItems = () => {
+    function filterItems() {
       const q = searchInput.value.toLowerCase();
       const cat = categorySelect.value;
-      filteredItems = allItems.filter(i=>i.title.toLowerCase().includes(q) && (!cat||i.group===cat));
-      currentPage=1; renderPage();
-    };
+      filteredItems = allItems.filter(i => i.title.toLowerCase().includes(q) && (!cat || i.group === cat));
+      currentPage = 1;
+      renderPage();
+    }
     searchInput.oninput = filterItems;
     categorySelect.onchange = filterItems;
 
-    // Categorias
-    const updateCategories = () => {
-      const cats = [...new Set(allItems.map(i=>i.group).filter(Boolean))].sort();
+    function updateCategories() {
+      const cats = [...new Set(allItems.map(i => i.group).filter(Boolean))].sort();
       categorySelect.innerHTML = '<option value="">Todas as Categorias</option>';
-      cats.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;categorySelect.appendChild(o);});
-    };
+      cats.forEach(c => {
+        const o = document.createElement('option');
+        o.value = c;
+        o.textContent = c;
+        categorySelect.appendChild(o);
+      });
+    }
 
-    // Carregar lista
-    const loadList = async source => {
+    async function loadList(src) {
       loadSpinner.classList.remove('hidden');
       try {
         let text = '';
-        if (source==='fetch') {
-          const res = await fetch('https://corsproxy.io/?https://invictosplay.pro/get.php?username=990884351752&password=695428673398&type=m3u_plus&output=mpegts'); text=await res.text();
+        if (src === 'fetch') {
+          const res = await fetch('https://corsproxy.io/?https://invictosplay.pro/get.php?username=990884351752&password=695428673398&type=m3u_plus&output=mpegts');
+          text = await res.text();
         } else {
-          const file = fileInput.files[0]; if (!file) return; text = await file.text();
+          const f = fileInput.files[0];
+          if (!f) return;
+          text = await f.text();
         }
-        allItems = parseM3U(text); updateCategories(); filterItems();
-      } catch(e) { alert('Erro: '+e.message); }
+        allItems = parseM3U(text);
+        updateCategories();
+        filterItems();
+      } catch (e) {
+        alert('Erro: ' + e.message);
+      }
       loadSpinner.classList.add('hidden');
-    };
-    baixarBtn.onclick = ()=> loadList('fetch');
-    fileInput.onchange = ()=> loadList('file');
-
+    }
+    baixarBtn.onclick = () => loadList('fetch');
+    fileInput.onchange = () => loadList('file');
   </script>
 </body>
 </html>
