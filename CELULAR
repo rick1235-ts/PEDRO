@@ -3,83 +3,94 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Rykelmy Filmes</title>
+  <title>🎬 Rykelmy Filmes 2.0</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
-<body class="bg-black text-white font-sans">
-  <div class="p-4 max-w-7xl mx-auto">
-    <h1 class="text-4xl font-bold mb-6">🎬 Rykelmy Filmes</h1>
+<body class="bg-black text-white font-sans min-h-screen flex flex-col">
+  <div class="p-4 max-w-7xl mx-auto flex-1">
+    <h1 class="text-4xl font-bold mb-6 text-center">🎬 Rykelmy Filmes</h1>
 
-    <input type="file" id="fileInput" accept=".m3u,.txt" class="mb-6 block text-white file:bg-gray-800 file:border-none file:px-4 file:py-2 file:rounded file:text-white file:cursor-pointer" />
-
-    <div class="mb-6">
-      <input type="text" id="searchInput" placeholder="Pesquisar..." class="p-3 w-full max-w-md rounded bg-gray-800 text-white placeholder-gray-400 border border-gray-600" />
+    <div class="flex flex-col sm:flex-row gap-4 mb-6 items-center justify-center">
+      <input type="file" id="fileInput" accept=".m3u,.txt" class="file:bg-gray-800 file:border-none file:px-4 file:py-2 file:rounded file:text-white file:cursor-pointer" />
+      <input type="text" id="searchInput" placeholder="Pesquisar..." class="p-3 rounded bg-gray-800 text-white placeholder-gray-400 border border-gray-600 w-full sm:w-80" />
+      <button onclick="baixarLista()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded whitespace-nowrap">
+        📥 Baixar Lista
+      </button>
     </div>
 
-    <video id="player" controls muted class="w-full max-w-4xl mx-auto mb-10 hidden rounded-lg shadow-lg"></video>
+    <div id="playerContainer" class="relative mb-10 hidden max-w-4xl mx-auto w-full">
+      <video id="player" controls playsinline muted class="w-full block rounded-lg shadow-2xl"></video>
+      <button id="closePlayer" class="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-full">✖</button>
+    </div>
 
-    <h2 class="text-2xl mb-2">Conteúdo disponível</h2>
-    <div id="content" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
-    <div id="loadMoreContainer" class="mt-4 flex justify-center"></div>
+    <h2 class="text-2xl mb-4">Conteúdo Disponível</h2>
+    <div id="content" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
+    <div id="loadMoreContainer" class="mt-6 flex justify-center"></div>
   </div>
+
+  <footer class="text-center text-gray-500 p-4 text-sm">
+    © 2025 - Rykelmy Filmes
+  </footer>
 
   <script>
     const fileInput = document.getElementById('fileInput');
     const searchInput = document.getElementById('searchInput');
     const contentDiv = document.getElementById('content');
+    const playerContainer = document.getElementById('playerContainer');
     const player = document.getElementById('player');
+    const closePlayer = document.getElementById('closePlayer');
     const loadMoreContainer = document.getElementById('loadMoreContainer');
 
     let allItems = [];
     let filteredItems = [];
     let currentPage = 1;
     const itemsPerPage = 60;
+    let hlsInstance = null;
 
     const renderItem = (container) => (item) => {
       const card = document.createElement('div');
       card.className = 'bg-gray-800 p-2 rounded-xl cursor-pointer hover:scale-105 transition duration-300';
       card.innerHTML = `
         <img src="${item.thumb || 'https://dummyimage.com/300x169/444/fff.png&text=Sem+Imagem'}" alt="${item.title}" class="aspect-video object-cover rounded-lg mb-2 w-full"/>
-        <h3 class="text-sm truncate text-center">${item.title}</h3>
+        <h3 class="text-sm truncate">${item.title}</h3>
       `;
       card.onclick = () => openVideoLink(item);
       container.appendChild(card);
     };
 
     const openVideoLink = (item) => {
-      const isValidVideoLink = (url) => /\.(mp4|m3u8|ts|avi|mov|mpg|flv|webm)(\?.*)?$/i.test(url);
-
-      if (isValidVideoLink(item.url)) {
-        if (item.url.endsWith('.m3u8') && Hls.isSupported()) {
-          const hls = new Hls();
-          hls.loadSource(item.url);
-          hls.attachMedia(player);
-          hls.on(Hls.Events.MANIFEST_PARSED, function () {
-            player.play().catch(() => alert('Toque no vídeo para iniciar.'));
-          });
-        } else {
-          player.src = item.url;
-          player.load();
-          player.play().catch(() => alert('Toque no vídeo para iniciar.'));
-        }
-
-        player.classList.remove('hidden');
-      } else {
-        alert("Link inválido para reprodução.");
+      if (hlsInstance) {
+        hlsInstance.destroy();
+        hlsInstance = null;
       }
+
+      if (/\.(m3u8)$/i.test(item.url) && Hls.isSupported()) {
+        hlsInstance = new Hls();
+        hlsInstance.loadSource(item.url);
+        hlsInstance.attachMedia(player);
+        hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+          player.play().catch(() => alert("Clique no botão de play para iniciar o vídeo."));
+        });
+      } else if (/\.(mp4|ts|avi|mov|mpg|flv|webm)$/i.test(item.url)) {
+        player.src = item.url;
+        player.play().catch(() => alert("Clique no botão de play para iniciar o vídeo."));
+      } else {
+        window.open(item.url, '_blank');
+        return;
+      }
+      playerContainer.classList.remove('hidden');
     };
 
-    // Ativa tela cheia ao clicar no player
-    player.addEventListener('click', () => {
-      if (player.requestFullscreen) {
-        player.requestFullscreen();
-      } else if (player.webkitRequestFullscreen) {
-        player.webkitRequestFullscreen();
-      } else if (player.msRequestFullscreen) {
-        player.msRequestFullscreen();
+    closePlayer.onclick = () => {
+      if (hlsInstance) {
+        hlsInstance.destroy();
+        hlsInstance = null;
       }
-    });
+      player.pause();
+      player.src = "";
+      playerContainer.classList.add('hidden');
+    };
 
     const renderPage = () => {
       const start = (currentPage - 1) * itemsPerPage;
@@ -92,8 +103,8 @@
       if (filteredItems.length <= currentPage * itemsPerPage) return;
 
       const btn = document.createElement('button');
-      btn.textContent = 'Carregar mais';
-      btn.className = 'px-4 py-2 bg-gray-700 rounded hover:bg-gray-600 transition';
+      btn.textContent = 'Carregar Mais';
+      btn.className = 'px-6 py-2 bg-gray-700 rounded hover:bg-gray-600 transition';
       btn.onclick = () => {
         currentPage++;
         renderPage();
@@ -104,7 +115,7 @@
 
     const filterItems = () => {
       const search = searchInput.value.toLowerCase();
-      filteredItems = allItems.filter(item => item.title.toLowerCase().includes(search) && /\.(mp4|m3u8|ts|avi|mov|mpg|flv|webm)(\?.*)?$/i.test(item.url));
+      filteredItems = allItems.filter(item => item.title.toLowerCase().includes(search));
       currentPage = 1;
       contentDiv.innerHTML = '';
       renderPage();
@@ -132,6 +143,12 @@
     const handleFile = (e) => {
       const file = e.target.files[0];
       if (!file) return;
+
+      if (!file.name.match(/\.(m3u|txt)$/i)) {
+        alert('Formato inválido. Por favor, selecione um arquivo .m3u ou .txt.');
+        return;
+      }
+
       const reader = new FileReader();
       reader.onload = (event) => {
         allItems = parseM3U(event.target.result);
@@ -140,18 +157,23 @@
       reader.readAsText(file);
     };
 
+    function baixarLista() {
+      const link = "http://invictosplay.pro/get.php?username=990884351752&password=695428673398&type=m3u_plus&output=mpegts";
+      const a = document.createElement('a');
+      a.href = link;
+      a.setAttribute('target', '_blank');
+      a.click();
+    }
+
     fileInput.addEventListener('change', handleFile);
     searchInput.addEventListener('input', filterItems);
 
-    // Lista para teste inicial
-    const fallbackM3U = `#EXTM3U
-#EXTINF:-1 tvg-logo="https://upload.wikimedia.org/wikipedia/commons/7/7a/Logonetflix.png",Elite S08E07
-https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
-#EXTINF:-1 tvg-logo="https://upload.wikimedia.org/wikipedia/commons/7/74/Globoplay_logo_2023.svg",Globo Ao Vivo
-https://stmv1.srvif.com/globotv/globotv/playlist.m3u8`;
-
     window.onload = () => {
-      allItems = parseM3U(fallbackM3U);
+      allItems = parseM3U(`#EXTM3U
+#EXTINF:-1 tvg-logo="https://upload.wikimedia.org/wikipedia/commons/7/7a/Logonetflix.png",Big Buck Bunny
+https://www.w3schools.com/html/mov_bbb.mp4
+#EXTINF:-1 tvg-logo="https://upload.wikimedia.org/wikipedia/commons/7/74/Globoplay_logo_2023.svg",Live Demo M3U8
+https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8`);
       filterItems();
     };
   </script>
