@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rykelmy Filmes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body class="bg-black text-white font-sans">
+  <div class="p-4 max-w-7xl mx-auto">
+    <h1 class="text-4xl font-bold mb-6">🎬 Rykelmy Filmes</h1>
+
+    <input type="file" id="fileInput" accept=".m3u,.txt" class="mb-6 block text-white file:bg-gray-800 file:border-none file:px-4 file:py-2 file:rounded file:text-white file:cursor-pointer" />
+
+    <div class="mb-6">
+      <input type="text" id="searchInput" placeholder="Pesquisar..." class="p-3 w-full max-w-md rounded bg-gray-800 text-white placeholder-gray-400 border border-gray-600" />
+    </div>
+
+    <video id="player" controls muted class="w-full max-w-4xl mx-auto mb-10 hidden rounded-lg shadow-lg"></video>
+
+    <h2 class="text-2xl mb-2">Conteúdo disponível</h2>
+    <div id="content" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
+    <div id="loadMoreContainer" class="mt-4 flex justify-center"></div>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const searchInput = document.getElementById('searchInput');
+    const contentDiv = document.getElementById('content');
+    const player = document.getElementById('player');
+    const loadMoreContainer = document.getElementById('loadMoreContainer');
+
+    let allItems = [];
+    let filteredItems = [];
+    let currentPage = 1;
+    const itemsPerPage = 60;
+
+    const renderItem = (container) => (item) => {
+      const card = document.createElement('div');
+      card.className = 'bg-gray-800 p-2 rounded-xl cursor-pointer hover:scale-105 transition duration-300';
+      card.innerHTML = `
+        <img src="${item.thumb || 'https://dummyimage.com/300x169/444/fff.png&text=Sem+Imagem'}" alt="${item.title}" class="aspect-video object-cover rounded-lg mb-2 w-full"/>
+        <h3 class="text-sm truncate text-center">${item.title}</h3>
+      `;
+      card.onclick = () => openVideoLink(item);
+      container.appendChild(card);
+    };
+
+    const openVideoLink = (item) => {
+      const isValidVideoLink = (url) => /\.(mp4|m3u8|ts|avi|mov|mpg|flv|webm)(\?.*)?$/i.test(url);
+
+      if (isValidVideoLink(item.url)) {
+        if (item.url.endsWith('.m3u8') && Hls.isSupported()) {
+          const hls = new Hls();
+          hls.loadSource(item.url);
+          hls.attachMedia(player);
+          hls.on(Hls.Events.MANIFEST_PARSED, function () {
+            player.play().catch(() => alert('Toque no vídeo para iniciar.'));
+          });
+        } else {
+          player.src = item.url;
+          player.load();
+          player.play().catch(() => alert('Toque no vídeo para iniciar.'));
+        }
+
+        player.classList.remove('hidden');
+      } else {
+        alert("Link inválido para reprodução.");
+      }
+    };
+
+    // Ativa tela cheia ao clicar no player
+    player.addEventListener('click', () => {
+      if (player.requestFullscreen) {
+        player.requestFullscreen();
+      } else if (player.webkitRequestFullscreen) {
+        player.webkitRequestFullscreen();
+      } else if (player.msRequestFullscreen) {
+        player.msRequestFullscreen();
+      }
+    });
+
+    const renderPage = () => {
+      const start = (currentPage - 1) * itemsPerPage;
+      const end = currentPage * itemsPerPage;
+      filteredItems.slice(start, end).forEach(renderItem(contentDiv));
+    };
+
+    const setupLoadMore = () => {
+      loadMoreContainer.innerHTML = '';
+      if (filteredItems.length <= currentPage * itemsPerPage) return;
+
+      const btn = document.createElement('button');
+      btn.textContent = 'Carregar mais';
+      btn.className = 'px-4 py-2 bg-gray-700 rounded hover:bg-gray-600 transition';
+      btn.onclick = () => {
+        currentPage++;
+        renderPage();
+        setupLoadMore();
+      };
+      loadMoreContainer.appendChild(btn);
+    };
+
+    const filterItems = () => {
+      const search = searchInput.value.toLowerCase();
+      filteredItems = allItems.filter(item => item.title.toLowerCase().includes(search) && /\.(mp4|m3u8|ts|avi|mov|mpg|flv|webm)(\?.*)?$/i.test(item.url));
+      currentPage = 1;
+      contentDiv.innerHTML = '';
+      renderPage();
+      setupLoadMore();
+    };
+
+    const parseM3U = (text) => {
+      const lines = text.split('\n');
+      const items = [];
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith('#EXTINF')) {
+          const titleMatch = lines[i].match(/,(.*)/);
+          const logoMatch = lines[i].match(/tvg-logo="(.*?)"/);
+          const title = titleMatch ? titleMatch[1].trim() : 'Sem título';
+          const thumb = logoMatch ? logoMatch[1].trim() : null;
+          const url = lines[i + 1]?.trim();
+          if (title && url && url.startsWith('http') && /\.(mp4|m3u8|ts|avi|mov|mpg|flv|webm)(\?.*)?$/i.test(url)) {
+            items.push({ title, url, thumb });
+          }
+        }
+      }
+      return items;
+    };
+
+    const handleFile = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        allItems = parseM3U(event.target.result);
+        filterItems();
+      };
+      reader.readAsText(file);
+    };
+
+    fileInput.addEventListener('change', handleFile);
+    searchInput.addEventListener('input', filterItems);
+
+    // Lista para teste inicial
+    const fallbackM3U = `#EXTM3U
+#EXTINF:-1 tvg-logo="https://upload.wikimedia.org/wikipedia/commons/7/7a/Logonetflix.png",Elite S08E07
+https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8
+#EXTINF:-1 tvg-logo="https://upload.wikimedia.org/wikipedia/commons/7/74/Globoplay_logo_2023.svg",Globo Ao Vivo
+https://stmv1.srvif.com/globotv/globotv/playlist.m3u8`;
+
+    window.onload = () => {
+      allItems = parseM3U(fallbackM3U);
+      filterItems();
+    };
+  </script>
+</body>
+</html>
