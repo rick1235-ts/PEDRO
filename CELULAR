@@ -3,29 +3,43 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🎮 Rykelmy Filmes 2.0</title>
+  <title>🎬 Rykelmy Filmes 2.0</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 <body class="bg-black text-white font-sans min-h-screen flex flex-col">
   <div class="p-6 max-w-7xl mx-auto flex-1">
-    <h1 class="text-4xl font-bold mb-6 text-center">🎮 Rykelmy Filmes</h1>
+    <h1 class="text-4xl font-bold mb-6 text-center">🎬 Rykelmy Filmes</h1>
 
-    <div class="flex flex-col md:flex-row gap-4 mb-6 justify-center">
+    <div class="flex flex-col md:flex-row gap-4 mb-6 justify-center items-center">
       <input type="file" id="fileInput" accept=".m3u,.txt" class="file:bg-gray-800 file:border-none file:px-4 file:py-2 file:rounded file:text-white file:cursor-pointer" />
-      <input type="text" id="searchInput" placeholder="Pesquisar..." class="p-3 rounded bg-gray-800 text-white placeholder-gray-400 border border-gray-600 w-full md:w-96" />
-      <button id="baixarListaBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">👅 Baixar Lista
+      <input type="text" id="searchInput" placeholder="Pesquisar..." class="p-3 rounded bg-gray-800 text-white placeholder-gray-400 border border-gray-600 w-full md:w-80" />
+      <select id="categorySelect" class="p-3 rounded bg-gray-800 text-white border border-gray-600 w-full md:w-60">
+        <option value="">Todas as Categorias</option>
+      </select>
+      <button id="baixarListaBtn" class="relative bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded flex items-center justify-center">
+        <span id="loadSpinner" class="absolute left-3 w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin hidden"></span>
+        📥 Baixar Lista
       </button>
     </div>
 
     <div id="playerContainer" class="relative mb-10 hidden">
       <video id="player" controls muted class="w-full max-w-4xl mx-auto block rounded-lg shadow-2xl"></video>
-      <button id="closePlayer" class="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-full">&#10006;</button>
+      <button id="closePlayer" class="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-full">✖</button>
     </div>
 
     <h2 class="text-2xl mb-4">Conteúdo Disponível</h2>
     <div id="content" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
     <div id="loadMoreContainer" class="mt-6 flex justify-center"></div>
+  </div>
+
+  <!-- Modal para Episódios -->
+  <div id="episodesModal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center">
+    <div class="bg-gray-900 rounded-xl p-6 max-w-lg w-full relative">
+      <button id="closeModal" class="absolute top-3 right-3 text-white text-2xl">&times;</button>
+      <h3 id="modalTitle" class="text-xl font-bold mb-4">Episódios</h3>
+      <div id="episodesList" class="space-y-2 max-h-96 overflow-y-auto"></div>
+    </div>
   </div>
 
   <footer class="text-center text-gray-500 p-4 text-sm">
@@ -40,6 +54,13 @@
     const player = document.getElementById('player');
     const closePlayer = document.getElementById('closePlayer');
     const loadMoreContainer = document.getElementById('loadMoreContainer');
+    const categorySelect = document.getElementById('categorySelect');
+    const baixarBtn = document.getElementById('baixarListaBtn');
+    const loadSpinner = document.getElementById('loadSpinner');
+    const episodesModal = document.getElementById('episodesModal');
+    const closeModal = document.getElementById('closeModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const episodesList = document.getElementById('episodesList');
 
     let allItems = [];
     let filteredItems = [];
@@ -47,135 +68,134 @@
     const itemsPerPage = 60;
     let hlsInstance = null;
 
-    const renderItem = (container) => (item) => {
+    // Parse M3U
+    const parseM3U = text => text.split('\n').reduce((acc, line, i, arr) => {
+      if (line.startsWith('#EXTINF')) {
+        const titleMatch = line.match(/,(.*)/);
+        const logoMatch = line.match(/tvg-logo="(.*?)"/);
+        const groupMatch = line.match(/group-title="(.*?)"/);
+        const title = titleMatch ? titleMatch[1].trim() : 'Sem título';
+        const thumb = logoMatch ? logoMatch[1].trim() : null;
+        const group = groupMatch ? groupMatch[1].trim() : '';
+        const url = (arr[i+1] || '').trim();
+        if (title && url.startsWith('http')) acc.push({ title, url, thumb, group });
+      }
+      return acc;
+    }, []);
+
+    // Agrupa séries e filmes
+    const groupBySeries = items => items.reduce((acc, item) => {
+      const m = item.title.match(/^(.*) S\d+E\d+/);
+      if (m) {
+        const name = m[1].trim();
+        acc.series[name] = acc.series[name] || [];
+        acc.series[name].push(item);
+      } else acc.movies.push(item);
+      return acc;
+    }, { series: {}, movies: [] });
+
+    // Renderiza itens principais
+    const renderPage = () => {
+      contentDiv.innerHTML = '';
+      const { series, movies } = groupBySeries(filteredItems);
+      // Séries
+      Object.entries(series).forEach(([name, eps]) => {
+        const card = document.createElement('div');
+        card.className = 'bg-gray-800 p-2 rounded-xl cursor-pointer hover:scale-105 transition duration-300 overflow-hidden';
+        card.innerHTML = `<h3 class="font-bold text-center">${name}</h3><p class="text-sm text-center">${eps.length} eps</p>`;
+        card.onclick = () => showSeries(name, eps);
+        contentDiv.appendChild(card);
+      });
+      // Filmes (paginados)
+      const start = (currentPage-1)*itemsPerPage;
+      movies.slice(start, start+itemsPerPage).forEach(item => renderItem(item));
+      // Load more
+      setupLoadMore(movies.length);
+    };
+
+    const renderItem = item => {
       const card = document.createElement('div');
       card.className = 'bg-gray-800 p-2 rounded-xl cursor-pointer hover:scale-105 transition duration-300 overflow-hidden';
       card.innerHTML = `
-        <img src="${item.thumb || 'https://dummyimage.com/300x169/444/fff.png&text=Sem+Imagem'}" alt="${item.title}" class="aspect-video object-cover rounded-lg mb-2 w-full"/>
-        <h3 class="text-sm truncate">${item.title}</h3>
-      `;
-      card.onclick = () => openVideoLink(item);
-      container.appendChild(card);
+        <img src="${item.thumb||'https://dummyimage.com/300x169/444/fff.png&text=Sem+Imagem'}" alt="${item.title}" class="aspect-video object-cover rounded-lg mb-2 w-full" onerror="this.src='https://dummyimage.com/300x169/444/fff.png&text=Sem+Imagem'"/>
+        <h3 class="text-sm truncate">${item.title}</h3>`;
+      card.onclick = () => { openVideoLink(item); window.scrollTo({top:0,behavior:'smooth'}); };
+      contentDiv.appendChild(card);
     };
 
-    const openVideoLink = (item) => {
-      if (hlsInstance) {
-        hlsInstance.destroy();
-        hlsInstance = null;
+    // Load more
+    const setupLoadMore = total => {
+      loadMoreContainer.innerHTML = '';
+      if (total > currentPage*itemsPerPage) {
+        const btn = document.createElement('button');
+        btn.textContent = 'Carregar Mais';
+        btn.className = 'px-6 py-2 bg-gray-700 rounded hover:bg-gray-600 transition';
+        btn.onclick = () => { currentPage++; renderPage(); };
+        loadMoreContainer.appendChild(btn);
       }
+    };
 
+    // Mostrar série
+    const showSeries = (name, episodes) => {
+      modalTitle.textContent = name;
+      episodesList.innerHTML = '';
+      episodes.forEach(ep => {
+        const btn = document.createElement('button');
+        btn.className = 'w-full text-left p-2 bg-gray-700 rounded hover:bg-gray-600';
+        btn.textContent = ep.title;
+        btn.onclick = () => { toggleModal(false); openVideoLink(ep); };
+        episodesList.appendChild(btn);
+      });
+      toggleModal(true);
+    };
+    const toggleModal = show => show ? episodesModal.classList.remove('hidden') : episodesModal.classList.add('hidden');
+    closeModal.onclick = () => toggleModal(false);
+
+    // Player
+    const openVideoLink = item => {
+      if (hlsInstance) { hlsInstance.destroy(); hlsInstance=null; }
       if (/\.m3u8$/i.test(item.url) && Hls.isSupported()) {
-        hlsInstance = new Hls();
-        hlsInstance.loadSource(item.url);
-        hlsInstance.attachMedia(player);
-        hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-          player.play().catch(() => console.warn("Autoplay bloqueado"));
-        });
-      } else if (/\.(mp4|ts|avi|mov|mpg|flv|webm)$/i.test(item.url)) {
-        player.src = item.url;
-        player.play().catch(() => console.warn("Autoplay bloqueado"));
-      } else {
-        window.open(item.url, '_blank');
-        return;
-      }
+        hlsInstance = new Hls(); hlsInstance.loadSource(item.url); hlsInstance.attachMedia(player);
+        hlsInstance.on(Hls.Events.MANIFEST_PARSED, ()=>player.play().catch(_=>{}));
+      } else { player.src=item.url; player.play().catch(_=>{}); }
       playerContainer.classList.remove('hidden');
     };
+    closePlayer.onclick = () => { if(hlsInstance){hlsInstance.destroy();hlsInstance=null;} player.pause();player.src='';playerContainer.classList.add('hidden'); };
 
-    closePlayer.onclick = () => {
-      if (hlsInstance) {
-        hlsInstance.destroy();
-        hlsInstance = null;
-      }
-      player.pause();
-      player.src = "";
-      playerContainer.classList.add('hidden');
-    };
-
-    const renderPage = () => {
-      const start = (currentPage - 1) * itemsPerPage;
-      const end = currentPage * itemsPerPage;
-      filteredItems.slice(start, end).forEach(renderItem(contentDiv));
-    };
-
-    const setupLoadMore = () => {
-      loadMoreContainer.innerHTML = '';
-      if (filteredItems.length <= currentPage * itemsPerPage) return;
-
-      const btn = document.createElement('button');
-      btn.textContent = 'Carregar Mais';
-      btn.className = 'px-6 py-2 bg-gray-700 rounded hover:bg-gray-600 transition';
-      btn.onclick = () => {
-        currentPage++;
-        renderPage();
-        setupLoadMore();
-      };
-      loadMoreContainer.appendChild(btn);
-    };
-
+    // Filtro
     const filterItems = () => {
-      const search = searchInput.value.toLowerCase();
-      filteredItems = allItems.filter(item => item.title.toLowerCase().includes(search));
-      currentPage = 1;
-      contentDiv.innerHTML = '';
-      renderPage();
-      setupLoadMore();
+      const q = searchInput.value.toLowerCase();
+      const cat = categorySelect.value;
+      filteredItems = allItems.filter(i=>i.title.toLowerCase().includes(q) && (!cat||i.group===cat));
+      currentPage=1; renderPage();
+    };
+    searchInput.oninput = filterItems;
+    categorySelect.onchange = filterItems;
+
+    // Categorias
+    const updateCategories = () => {
+      const cats = [...new Set(allItems.map(i=>i.group).filter(Boolean))].sort();
+      categorySelect.innerHTML = '<option value="">Todas as Categorias</option>';
+      cats.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;categorySelect.appendChild(o);});
     };
 
-    const parseM3U = (text) => {
-      const lines = text.split('\n');
-      const items = [];
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].startsWith('#EXTINF')) {
-          const titleMatch = lines[i].match(/,(.*)/);
-          const logoMatch = lines[i].match(/tvg-logo="(.*?)"/);
-          const title = titleMatch ? titleMatch[1].trim() : 'Sem título';
-          const thumb = logoMatch ? logoMatch[1].trim() : null;
-          const url = lines[i + 1]?.trim();
-          if (title && url && url.startsWith('http') && /\.(mp4|m3u8|ts|avi|mov|mpg|flv|webm)(\?.*)?$/i.test(url)) {
-            items.push({ title, url, thumb });
-          }
-        }
-      }
-      return items;
-    };
-
-    const handleFile = (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        allItems = parseM3U(event.target.result);
-        filterItems();
-      };
-      reader.readAsText(file);
-    };
-
-    fileInput.addEventListener('change', handleFile);
-    searchInput.addEventListener('input', filterItems);
-
-    document.getElementById("baixarListaBtn").addEventListener("click", async () => {
+    // Carregar lista
+    const loadList = async source => {
+      loadSpinner.classList.remove('hidden');
       try {
-        const url = "https://corsproxy.io/?https://invictosplay.pro/get.php?username=990884351752&password=695428673398&type=m3u_plus&output=mpegts";
-        const res = await fetch(url);
-        const data = await res.text();
-        allItems = parseM3U(data);
-        filterItems();
-      } catch (err) {
-        alert("Erro ao baixar a lista: " + err.message);
-      }
-    });
-
-    const fallbackM3U = `#EXTM3U
-#EXTINF:-1 tvg-logo="https://upload.wikimedia.org/wikipedia/commons/7/7a/Logonetflix.png",Big Buck Bunny
-https://www.w3schools.com/html/mov_bbb.mp4
-#EXTINF:-1 tvg-logo="https://upload.wikimedia.org/wikipedia/commons/7/74/Globoplay_logo_2023.svg",Live Demo M3U8
-https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8`;
-
-    window.onload = () => {
-      allItems = parseM3U(fallbackM3U);
-      filterItems();
+        let text = '';
+        if (source==='fetch') {
+          const res = await fetch('https://corsproxy.io/?https://invictosplay.pro/get.php?username=990884351752&password=695428673398&type=m3u_plus&output=mpegts'); text=await res.text();
+        } else {
+          const file = fileInput.files[0]; if (!file) return; text = await file.text();
+        }
+        allItems = parseM3U(text); updateCategories(); filterItems();
+      } catch(e) { alert('Erro: '+e.message); }
+      loadSpinner.classList.add('hidden');
     };
+    baixarBtn.onclick = ()=> loadList('fetch');
+    fileInput.onchange = ()=> loadList('file');
+
   </script>
 </body>
 </html>
