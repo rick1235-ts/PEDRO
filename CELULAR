@@ -1,148 +1,164 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🎬 Rykelmy Filmes 2.0</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-</head>
-<body class="bg-black text-white font-sans min-h-screen flex flex-col">
-  <div class="p-6 max-w-7xl mx-auto flex-1">
-    <h1 class="text-4xl font-bold mb-6 text-center">🎬 Rykelmy Filmes</h1>
-
-    <div class="flex flex-col md:flex-row gap-4 mb-6 justify-center items-center">
-      <input type="file" id="fileInput" accept=".m3u,.txt" class="file:bg-gray-800 file:border-none file:px-4 file:py-2 file:rounded file:text-white file:cursor-pointer" />
-      <input type="text" id="searchInput" placeholder="Pesquisar..." class="p-3 rounded bg-gray-800 text-white placeholder-gray-400 border border-gray-600 w-full md:w-80" />
-      <select id="categorySelect" class="p-3 rounded bg-gray-800 text-white border border-gray-600 w-full md:w-60">
-        <option value="">Todas as Categorias</option>
-      </select>
-      <button id="baixarListaBtn" class="relative bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded flex items-center justify-center">
-        <span id="loadSpinner" class="absolute left-3 w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin hidden"></span>
-        📥 Baixar Lista
-      </button>
+<!-- TELA DE LOGIN -->
+<div id="loginScreen" class="fixed inset-0 bg-black flex items-center justify-center z-50">
+    <div class="bg-gray-900 p-6 rounded-xl w-full max-w-sm space-y-4 text-center">
+      <h2 class="text-2xl font-bold">🔐 Login</h2>
+      <input id="loginUser" type="text" placeholder="Usuário" class="w-full p-3 rounded bg-gray-800 border border-gray-600 text-white" />
+      <input id="loginPass" type="password" placeholder="Senha" class="w-full p-3 rounded bg-gray-800 border border-gray-600 text-white" />
+      <button id="loginBtn" class="w-full bg-green-600 hover:bg-green-700 text-white p-3 rounded">Entrar</button>
+      <p id="loginError" class="text-red-500 hidden">Usuário ou senha incorretos.</p>
     </div>
-
-    <div id="playerContainer" class="relative mb-10 hidden">
-      <video id="player" controls muted class="w-full max-w-4xl mx-auto block rounded-lg shadow-2xl"></video>
-      <div class="mt-2 flex justify-center gap-4">
-        <button id="prevEpisodeBtn" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded">Anterior</button>
-        <button id="nextEpisodeBtn" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded">Próximo</button>
+    
+  </div>
+  
+  <!DOCTYPE html>
+  <html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🎬 Rykelmy Filmes 2.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  </head>
+  <body class="bg-black text-white font-sans min-h-screen flex flex-col">
+    <div class="p-6 max-w-7xl mx-auto flex-1">
+      <h1 class="text-4xl font-bold mb-6 text-center">🎬 Rykelmy Filmes</h1>
+  
+      <div class="flex flex-col md:flex-row gap-4 mb-6 justify-center items-center">
+        <input type="file" id="fileInput" accept=".m3u,.txt" class="file:bg-gray-800 file:border-none file:px-4 file:py-2 file:rounded file:text-white file:cursor-pointer" />
+        <input type="text" id="searchInput" placeholder="Pesquisar..." class="p-3 rounded bg-gray-800 text-white placeholder-gray-400 border border-gray-600 w-full md:w-80" />
+        <select id="categorySelect" class="p-3 rounded bg-gray-800 text-white border border-gray-600 w-full md:w-60">
+          <option value="">Todas as Categorias</option>
+        </select>
+        <button id="baixarListaBtn" class="relative bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded flex items-center justify-center">
+          <span id="loadSpinner" class="absolute left-3 w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin hidden"></span>
+          📥 Baixar Lista
+        </button>
       </div>
-      <button id="closePlayer" class="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-full">✖</button>
+  
+      <div id="playerContainer" class="relative mb-10 hidden">
+        <video id="player" controls muted class="w-full max-w-4xl mx-auto block rounded-lg shadow-2xl"></video>
+        <div class="mt-2 flex justify-center gap-4">
+          <button id="prevEpisodeBtn" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded">Anterior</button>
+          <button id="nextEpisodeBtn" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded">Próximo</button>
+        </div>
+        <button id="closePlayer" class="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-full">✖</button>
+      </div>
+  
+      <h2 class="text-2xl mb-4">Filmes Disponíveis</h2>
+      <div id="content" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
+      <div id="loadMoreContainer" class="mt-6 flex justify-center"></div>
     </div>
-
-    <h2 class="text-2xl mb-4">Filmes Disponíveis</h2>
-    <div id="content" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
-    <div id="loadMoreContainer" class="mt-6 flex justify-center"></div>
-  </div>
-
-  <!-- Modal para Episódios -->
-  <div id="episodesModal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center">
-    <div class="bg-gray-900 rounded-xl p-6 max-w-lg w-full relative">
-      <button id="closeModal" class="absolute top-3 right-3 text-white text-2xl">&times;</button>
-      <h3 id="modalTitle" class="text-xl font-bold mb-4">Episódios</h3>
-      <div id="episodesList" class="space-y-2 max-h-96 overflow-y-auto"></div>
+  
+    <!-- Modal para Episódios -->
+    <div id="episodesModal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center">
+      <div class="bg-gray-900 rounded-xl p-6 max-w-lg w-full relative">
+        <button id="closeModal" class="absolute top-3 right-3 text-white text-2xl">&times;</button>
+        <h3 id="modalTitle" class="text-xl font-bold mb-4">Episódios</h3>
+        <div id="episodesList" class="space-y-2 max-h-96 overflow-y-auto"></div>
+      </div>
     </div>
-  </div>
-
-  <footer class="text-center text-gray-500 p-4 text-sm">
-    © 2025 - Rykelmy Filmes
-  </footer>
-
-  <script>
-    const fileInput = document.getElementById('fileInput');
-    const searchInput = document.getElementById('searchInput');
-    const categorySelect = document.getElementById('categorySelect');
-    const contentDiv = document.getElementById('content');
-    const loadMoreContainer = document.getElementById('loadMoreContainer');
-    const baixarBtn = document.getElementById('baixarListaBtn');
-    const loadSpinner = document.getElementById('loadSpinner');
-    const playerContainer = document.getElementById('playerContainer');
-    const player = document.getElementById('player');
-    const closePlayer = document.getElementById('closePlayer');
-    const prevEpisodeBtn = document.getElementById('prevEpisodeBtn');
-    const nextEpisodeBtn = document.getElementById('nextEpisodeBtn');
-    const episodesModal = document.getElementById('episodesModal');
-    const closeModal = document.getElementById('closeModal');
-    const modalTitle = document.getElementById('modalTitle');
-    const episodesList = document.getElementById('episodesList');
-
-    let allItems = [];
-    let filteredItems = [];
-    let currentPage = 1;
-    const itemsPerPage = 60;
-    let hlsInstance = null;
-
-    let currentSeriesName = null;
-    let currentSeriesEps = [];
-    let currentEpIndex = null;
-
-    // Parse M3U e exclui 'Ao Vivo'
-    function parseM3U(text) {
-      const lines = text.split(/\r?\n/);
-      const items = [];
-      for (let i = 0; i < lines.length; i++) {
-        if (lines[i].startsWith('#EXTINF')) {
-          const title = (lines[i].match(/,(.*)/) || [])[1]?.trim();
-          const thumb = (lines[i].match(/tvg-logo="(.*?)"/) || [])[1] || 'https://dummyimage.com/300x169/444/fff.png&text=Sem+Imagem';
-          const group = (lines[i].match(/group-title="(.*?)"/) || [])[1] || '';
-          const url = lines[i+1]?.trim();
-          if (url && url.startsWith('http') && group.toLowerCase() !== 'ao vivo') {
-            items.push({ title, url, thumb, group });
+  
+    <footer class="text-center text-gray-500 p-4 text-sm">
+      © 2025 - Rykelmy Filmes
+    </footer>
+  
+    <script>
+      const fileInput = document.getElementById('fileInput');
+      const searchInput = document.getElementById('searchInput');
+      const categorySelect = document.getElementById('categorySelect');
+      const contentDiv = document.getElementById('content');
+      const loadMoreContainer = document.getElementById('loadMoreContainer');
+      const baixarBtn = document.getElementById('baixarListaBtn');
+      const loadSpinner = document.getElementById('loadSpinner');
+      const playerContainer = document.getElementById('playerContainer');
+      const player = document.getElementById('player');
+      const closePlayer = document.getElementById('closePlayer');
+      const prevEpisodeBtn = document.getElementById('prevEpisodeBtn');
+      const nextEpisodeBtn = document.getElementById('nextEpisodeBtn');
+      const episodesModal = document.getElementById('episodesModal');
+      const closeModal = document.getElementById('closeModal');
+      const modalTitle = document.getElementById('modalTitle');
+      const episodesList = document.getElementById('episodesList');
+  
+      let allItems = [];
+      let filteredItems = [];
+      let currentPage = 1;
+      const itemsPerPage = 60;
+      let hlsInstance = null;
+  
+      let currentSeriesName = null;
+      let currentSeriesEps = [];
+      let currentEpIndex = null;
+  
+      // Parse M3U e exclui canais "Ao Vivo" e URLs sem extensão VOD
+      function parseM3U(text) {
+        const lines = text.split(/\r?\n/);
+        const items = [];
+        const vodExt = /\.(mp4|mkv|mov|avi|webm|m3u8)$/i;
+  
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].startsWith('#EXTINF')) {
+            const title = (lines[i].match(/,(.*)/) || [])[1]?.trim();
+            const thumb = (lines[i].match(/tvg-logo="(.*?)"/) || [])[1] || 'https://dummyimage.com/300x169/444/fff.png&text=Sem+Imagem';
+            const group = (lines[i].match(/group-title="(.*?)"/) || [])[1] || '';
+            const url = lines[i+1]?.trim();
+            // só adiciona se não for "ao vivo" E tiver extensão VOD
+            if (
+              url &&
+              url.startsWith('http') &&
+              group.toLowerCase() !== 'ao vivo' &&
+              vodExt.test(url)
+            ) {
+              items.push({ title, url, thumb, group });
+            }
           }
         }
+        return items;
       }
-      return items;
-    }
-
-    // Agrupa séries e filmes
-    function groupItems(items) {
-      const series = {};
-      const movies = [];
-      items.forEach(item => {
-        const match = item.title.match(/^(.*) S(\d+)E(\d+)/);
-        if (match) {
-          const name = match[1].trim();
-          series[name] = series[name] || [];
-          series[name].push(item);
-        } else {
-          movies.push(item);
+  
+      // Agrupa séries e filmes
+      function groupItems(items) {
+        const series = {};
+        const movies = [];
+        items.forEach(item => {
+          const match = item.title.match(/^(.*) S(\d+)E(\d+)/);
+          if (match) {
+            const name = match[1].trim();
+            series[name] = series[name] || [];
+            series[name].push(item);
+          } else {
+            movies.push(item);
+          }
+        });
+        return { series, movies };
+      }
+  
+      // Renderiza filmes e séries
+      function renderPage() {
+        contentDiv.innerHTML = '';
+        const { series, movies } = groupItems(filteredItems);
+        const start = (currentPage - 1) * itemsPerPage;
+        movies.slice(start, start + itemsPerPage).forEach(renderCard);
+        loadMoreContainer.innerHTML = '';
+        if (movies.length > currentPage * itemsPerPage) {
+          const btn = document.createElement('button');
+          btn.textContent = 'Carregar Mais';
+          btn.className = 'px-6 py-2 bg-gray-700 rounded hover:bg-gray-600 transition';
+          btn.onclick = () => { currentPage++; renderPage(); };
+          loadMoreContainer.appendChild(btn);
         }
-      });
-      return { series, movies };
-    }
-
-    // Renderiza filmes paginados e séries como blocos
-    function renderPage() {
-      contentDiv.innerHTML = '';
-      const { series, movies } = groupItems(filteredItems);
-      const start = (currentPage - 1) * itemsPerPage;
-      movies.slice(start, start + itemsPerPage).forEach(renderCard);
-
-      loadMoreContainer.innerHTML = '';
-      if (movies.length > currentPage * itemsPerPage) {
-        const btn = document.createElement('button');
-        btn.textContent = 'Carregar Mais';
-        btn.className = 'px-6 py-2 bg-gray-700 rounded hover:bg-gray-600 transition';
-        btn.onclick = () => { currentPage++; renderPage(); };
-        loadMoreContainer.appendChild(btn);
+        Object.entries(series).forEach(([name, eps]) => {
+          const card = document.createElement('div');
+          card.className = 'bg-gray-800 p-2 rounded-xl cursor-pointer hover:scale-105 transition duration-300 overflow-hidden';
+          card.innerHTML = `
+            <img src="${eps[0].thumb}" alt="${name}" class="aspect-video object-cover rounded-lg mb-2 w-full" onerror="this.src='https://dummyimage.com/300x169/444/fff.png&text=Sem+Imagem'"/>
+            <h3 class="font-bold text-center">${name}</h3>
+            <p class="text-sm text-center">${eps.length} episódios</p>`;
+          card.onclick = () => openSeries(name, eps);
+          contentDiv.appendChild(card);
+        });
       }
-
-      // Série como um único card
-      Object.entries(series).forEach(([name, eps]) => {
-        const card = document.createElement('div');
-        card.className = 'bg-gray-800 p-2 rounded-xl cursor-pointer hover:scale-105 transition duration-300 overflow-hidden';
-        card.innerHTML = `
-          <img src="${eps[0].thumb}" alt="${name}" class="aspect-video object-cover rounded-lg mb-2 w-full" onerror="this.src='https://dummyimage.com/300x169/444/fff.png&text=Sem+Imagem'"/>
-          <h3 class="font-bold text-center">${name}</h3>
-          <p class="text-sm text-center">${eps.length} episódios</p>`;
-        card.onclick = () => openSeries(name, eps);
-        contentDiv.appendChild(card);
-      });
-    }
-
-    function renderCard(item) {
+      function renderCard(item) {
       const card = document.createElement('div');
       card.className = 'bg-gray-800 p-2 rounded-xl cursor-pointer hover:scale-105 transition duration-300 overflow-hidden';
       card.innerHTML = `
@@ -210,7 +226,10 @@
     function filterItems() {
       const q = searchInput.value.toLowerCase();
       const cat = categorySelect.value;
-      filteredItems = allItems.filter(i => i.title.toLowerCase().includes(q) && (!cat || i.group === cat));
+      filteredItems = allItems.filter(i =>
+        i.title.toLowerCase().includes(q) &&
+        (!cat || i.group === cat)
+      );
       currentPage = 1;
       renderPage();
     }
@@ -233,7 +252,7 @@
       try {
         let text = '';
         if (src === 'fetch') {
-          const res = await fetch('https://corsproxy.io/?https://invictosplay.pro/get.php?username=990884351752&password=695428673398&type=m3u_plus&output=mpegts');
+          const res = await fetch('https://invictosplay.pro/get.php?username=875124068733&password=440327002313&type=m3u_plus&output=mpegts');
           text = await res.text();
         } else {
           const f = fileInput.files[0];
@@ -250,6 +269,28 @@
     }
     baixarBtn.onclick = () => loadList('fetch');
     fileInput.onchange = () => loadList('file');
+    // Login simples (usuário e senha fixos)
+const loginScreen = document.getElementById('loginScreen');
+const loginBtn = document.getElementById('loginBtn');
+const loginUser = document.getElementById('loginUser');
+const loginPass = document.getElementById('loginPass');
+const loginError = document.getElementById('loginError');
+
+const USERNAME = 'admin';
+const PASSWORD = '1234';
+
+loginBtn.onclick = () => {
+  if (loginUser.value === USERNAME && loginPass.value === PASSWORD) {
+    loginScreen.classList.add('hidden');
+  } else {
+    loginError.classList.remove('hidden');
+  }
+};
   </script>
+  
 </body>
+
 </html>
+
+
+    
