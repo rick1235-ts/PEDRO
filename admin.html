@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin - Gerenciar Usuários</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-black text-white font-sans min-h-screen p-6">
+
+  <h1 class="text-3xl font-bold mb-6">👤 Painel de Administração - Usuários</h1>
+
+  <!-- Formulário para adicionar usuário -->
+  <div class="bg-gray-800 p-4 rounded mb-6">
+    <h2 class="text-xl mb-2">Cadastrar novo usuário</h2>
+    <input id="nomeUsuario" type="text" placeholder="Nome do usuário" class="w-full p-2 rounded mb-2 text-black" />
+    <label class="flex items-center mb-2">
+      <input id="ativoUsuario" type="checkbox" class="mr-2" />
+      Usuário ativo?
+    </label>
+    <button onclick="adicionarUsuario()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">Cadastrar</button>
+  </div>
+
+  <!-- Lista de usuários cadastrados -->
+  <div class="bg-gray-800 p-4 rounded">
+    <h2 class="text-xl mb-2">Usuários cadastrados</h2>
+    <ul id="listaUsuarios" class="space-y-2"></ul>
+  </div>
+
+  <script>
+    const salvarUsuarios = (usuarios) => localStorage.setItem('usuarios', JSON.stringify(usuarios));
+    const carregarUsuarios = () => JSON.parse(localStorage.getItem('usuarios')) || [];
+
+    function renderizarUsuarios() {
+      const lista = document.getElementById('listaUsuarios');
+      lista.innerHTML = "";
+      const usuarios = carregarUsuarios();
+
+      usuarios.forEach((usuario, index) => {
+        const li = document.createElement('li');
+        li.className = "flex justify-between items-center bg-gray-700 p-2 rounded";
+
+        const info = document.createElement('span');
+        info.innerHTML = `
+          <strong>${usuario.nome}</strong> - 
+          <span class="${usuario.ativo ? 'text-green-400' : 'text-red-400'}">
+            ${usuario.ativo ? 'Ativo' : 'Inativo'}
+          </span>
+        `;
+
+        const btnExcluir = document.createElement('button');
+        btnExcluir.textContent = "Excluir";
+        btnExcluir.className = "bg-red-600 hover:bg-red-700 px-3 py-1 rounded";
+        btnExcluir.onclick = () => {
+          usuarios.splice(index, 1);
+          salvarUsuarios(usuarios);
+          renderizarUsuarios();
+        };
+
+        li.appendChild(info);
+        li.appendChild(btnExcluir);
+        lista.appendChild(li);
+      });
+    }
+
+    function adicionarUsuario() {
+      const nome = document.getElementById('nomeUsuario').value.trim();
+      const ativo = document.getElementById('ativoUsuario').checked;
+
+      if (!nome) return alert("Digite o nome do usuário!");
+
+      const usuarios = carregarUsuarios();
+      usuarios.push({ nome, ativo });
+      salvarUsuarios(usuarios);
+
+      renderizarUsuarios();
+
+      document.getElementById('nomeUsuario').value = "";
+      document.getElementById('ativoUsuario').checked = false;
+    }
+
+    renderizarUsuarios();
+  </script>
+
+</body>
+</html>
