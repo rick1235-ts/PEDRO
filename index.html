@@ -3,94 +3,84 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>🎬 Rykelmy Filmes 2.0</title>
+  <title>Admin - Gerenciar Usuários</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
-<body class="bg-black text-white font-sans min-h-screen flex flex-col">
+<body class="bg-black text-white font-sans min-h-screen p-6">
 
-  <!-- LOGIN -->
-  <div id="loginScreen" class="fixed inset-0 bg-black flex items-center justify-center z-50">
-    <div class="bg-gray-900 p-6 rounded-xl w-full max-w-sm space-y-4 text-center">
-      <h2 class="text-2xl font-bold">🔐 Login</h2>
-      <input id="loginUser"    type="text"     placeholder="Usuário"                  class="w-full p-3 rounded bg-gray-800 border border-gray-600 text-white"/>
-      <input id="loginPass"    type="password" placeholder="Senha"                    class="w-full p-3 rounded bg-gray-800 border border-gray-600 text-white"/>
-      <input id="adminCode"    type="password" placeholder="Código Secreto Admin"     class="w-full p-3 rounded bg-gray-800 border border-gray-600 text-white"/>
-      <button id="loginBtn" class="relative w-full bg-green-600 hover:bg-green-700 text-white p-3 rounded">
-        <span id="loginBtnText">Entrar</span>
-        <span id="loginSpinner" class="absolute inset-y-0 right-4 w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin hidden"></span>
-      </button>
-      <p id="loginError" class="text-red-500 hidden">Credenciais inválidas ou sessão em uso.</p>
-    </div>
+  <h1 class="text-3xl font-bold mb-6">👤 Painel de Administração - Usuários</h1>
+
+  <!-- Formulário para adicionar usuário -->
+  <div class="bg-gray-800 p-4 rounded mb-6">
+    <h2 class="text-xl mb-2">Cadastrar novo usuário</h2>
+    <input id="nomeUsuario" type="text" placeholder="Nome do usuário" class="w-full p-2 rounded mb-2 text-black" />
+    <label class="flex items-center mb-2">
+      <input id="ativoUsuario" type="checkbox" class="mr-2" />
+      Usuário ativo?
+    </label>
+    <button onclick="adicionarUsuario()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">Cadastrar</button>
   </div>
 
-  <!-- APP -->
-  <div id="app" class="hidden flex-1 flex flex-col">
-    <header class="p-6 bg-gray-900 flex justify-between items-center">
-      <h1 class="text-3xl font-bold">🎬 Rykelmy Filmes</h1>
-      <nav class="space-x-4">
-        <button id="tabContentBtn" class="px-4 py-2 rounded bg-green-600">Conteúdo</button>
-        <button id="tabAdminBtn"   class="px-4 py-2 rounded bg-gray-700 hidden">Admin</button>
-        <button id="logoutBtn"     class="px-4 py-2 rounded bg-red-600">Sair</button>
-      </nav>
-    </header>
-
-    <main class="flex-1 overflow-auto p-6 max-w-7xl mx-auto">
-      <!-- ABA CONTEÚDO -->
-      <section id="contentTab">
-        <div class="flex flex-col md:flex-row gap-4 mb-6 justify-center items-center">
-          <input type="file" id="fileInput" accept=".m3u,.txt"
-            class="file:bg-gray-800 file:border-none file:px-4 file:py-2 file:rounded file:text-white file:cursor-pointer"/>
-          <input type="text" id="searchInput" placeholder="Pesquisar..."
-            class="p-3 rounded bg-gray-800 text-white placeholder-gray-400 border border-gray-600 w-full md:w-80"/>
-          <select id="categorySelect"
-            class="p-3 rounded bg-gray-800 text-white border border-gray-600 w-full md:w-60">
-            <option value="">Todas as Categorias</option>
-          </select>
-          <button id="baixarListaBtn" class="relative bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">
-            <span id="loadSpinner" class="absolute left-3 w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin hidden"></span>
-            📥 Baixar Lista
-          </button>
-        </div>
-
-        <div id="playerContainer" class="relative mb-10 hidden">
-          <video id="player" controls muted class="w-full max-w-4xl mx-auto rounded-lg shadow-2xl"></video>
-          <div class="mt-2 flex justify-center gap-4">
-            <button id="prevEpisodeBtn" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded">Anterior</button>
-            <button id="nextEpisodeBtn" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded">Próximo</button>
-          </div>
-          <button id="closePlayer" class="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-full">✖</button>
-        </div>
-
-        <h2 class="text-2xl mb-4">Filmes Disponíveis</h2>
-        <div id="content" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
-        <div id="loadMoreContainer" class="mt-6 flex justify-center"></div>
-      </section>
-
-      <!-- ABA ADMIN -->
-      <section id="adminTab" class="hidden">
-        <h2 class="text-2xl mb-4">Painel de Administração</h2>
-        <div class="mb-4 flex gap-2">
-          <input id="newUserInput" type="text"     placeholder="Novo Usuário" class="p-2 rounded bg-gray-800 border border-gray-600"/>
-          <input id="newPassInput" type="password" placeholder="Senha"        class="p-2 rounded bg-gray-800 border border-gray-600"/>
-          <button id="createUserBtn" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700">Criar Usuário</button>
-        </div>
-        <ul id="userList" class="space-y-2"></ul>
-      </section>
-
-      <!-- MODAL EPISÓDIOS -->
-      <div id="episodesModal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center">
-        <div class="bg-gray-900 rounded-xl p-6 max-w-lg w-full relative">
-          <button id="closeModal" class="absolute top-3 right-3 text-white text-2xl">×</button>
-          <h3 id="modalTitle" class="text-xl font-bold mb-4">Episódios</h3>
-          <div id="episodesList" class="space-y-2 max-h-96 overflow-y-auto"></div>
-        </div>
-      </div>
-    </main>
-
-    <footer class="text-center text-gray-500 p-4 text-sm">© 2025 - Rykelmy Filmes</footer>
+  <!-- Lista de usuários cadastrados -->
+  <div class="bg-gray-800 p-4 rounded">
+    <h2 class="text-xl mb-2">Usuários cadastrados</h2>
+    <ul id="listaUsuarios" class="space-y-2"></ul>
   </div>
 
-  <script src="app.js"></script>
+  <script>
+    const salvarUsuarios = (usuarios) => localStorage.setItem('usuarios', JSON.stringify(usuarios));
+    const carregarUsuarios = () => JSON.parse(localStorage.getItem('usuarios')) || [];
+
+    function renderizarUsuarios() {
+      const lista = document.getElementById('listaUsuarios');
+      lista.innerHTML = "";
+      const usuarios = carregarUsuarios();
+
+      usuarios.forEach((usuario, index) => {
+        const li = document.createElement('li');
+        li.className = "flex justify-between items-center bg-gray-700 p-2 rounded";
+
+        const info = document.createElement('span');
+        info.innerHTML = `
+          <strong>${usuario.nome}</strong> - 
+          <span class="${usuario.ativo ? 'text-green-400' : 'text-red-400'}">
+            ${usuario.ativo ? 'Ativo' : 'Inativo'}
+          </span>
+        `;
+
+        const btnExcluir = document.createElement('button');
+        btnExcluir.textContent = "Excluir";
+        btnExcluir.className = "bg-red-600 hover:bg-red-700 px-3 py-1 rounded";
+        btnExcluir.onclick = () => {
+          usuarios.splice(index, 1);
+          salvarUsuarios(usuarios);
+          renderizarUsuarios();
+        };
+
+        li.appendChild(info);
+        li.appendChild(btnExcluir);
+        lista.appendChild(li);
+      });
+    }
+
+    function adicionarUsuario() {
+      const nome = document.getElementById('nomeUsuario').value.trim();
+      const ativo = document.getElementById('ativoUsuario').checked;
+
+      if (!nome) return alert("Digite o nome do usuário!");
+
+      const usuarios = carregarUsuarios();
+      usuarios.push({ nome, ativo });
+      salvarUsuarios(usuarios);
+
+      renderizarUsuarios();
+
+      document.getElementById('nomeUsuario').value = "";
+      document.getElementById('ativoUsuario').checked = false;
+    }
+
+    renderizarUsuarios();
+  </script>
+
 </body>
 </html>
